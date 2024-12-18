@@ -84,7 +84,7 @@ async function run() {
     });
 
     app.get("/all-product", async (req, res) => {
-      const { brand, title, category, sort } = req.query;
+      const { brand, title, category, sort, page = 1, limit = 9 } = req.query;
 
       const query: TQuery = {};
 
@@ -101,11 +101,27 @@ async function run() {
 
       const sortOption = sort === "asc" ? 1 : -1;
 
-      const result = await allProductCollection
+      const pageNumber = Number(page);
+      const limitNumber = Number(limit);
+
+      const product = await allProductCollection
         .find(query)
+        .skip((pageNumber - 1) * limitNumber)
+        .limit(limitNumber)
         .sort({ price: sortOption })
         .toArray();
-      res.send(result);
+
+      const total = await allProductCollection.countDocuments(query);
+
+      // const productInfo = await allProductCollection
+      //   .find({}, { projection: { category: 1, brand: 1 } })
+      //   .toArray();
+      const brands = [...new Set(product.map((product) => product.brand))];
+      const categories = [
+        ...new Set(product.map((product) => product.category)),
+      ];
+
+      res.send({ product, categories, brands, total });
     });
 
     app.get("/my-product/:email", async (req: Request, res: Response) => {
