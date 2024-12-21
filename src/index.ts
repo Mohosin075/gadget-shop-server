@@ -6,14 +6,14 @@ import express, {
 } from "express";
 import cors from "cors";
 import jwt, { verify } from "jsonwebtoken";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
 import { TQuery } from "./types";
 const app = express();
 const port = 3000;
 
 // middleware
 require("dotenv").config();
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors());
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fudiykq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -51,7 +51,6 @@ async function run() {
 
     app.get("/user/:email", async (req, res) => {
       const { email } = req?.params;
-      console.log(email);
       const existUser = await usersCollection.findOne({ email });
       if (!existUser) {
         res.send({ message: "User Does not exist!" });
@@ -132,6 +131,71 @@ async function run() {
         return;
       }
       const result = await allProductCollection.findOne({ sellerEmail: email });
+      res.send(result);
+    });
+
+    app.patch("/wishlist/add", async (req, res) => {
+      const { userEmail, productId } = req.body;
+
+      const result = await usersCollection.updateOne(
+        { email: userEmail },
+        { $addToSet: { wishlist: new ObjectId(String(productId)) } }
+      );
+
+      res.send(result);
+    });
+
+    // remove from wishlist
+    app.patch("/wishlist/remove", async (req, res) => {
+      const { userEmail, productId } = req.body;
+
+      const isObjectIdStored = true;
+      const productIdToRemove = isObjectIdStored
+        ? new ObjectId(String(productId))
+        : productId;
+
+      const result = await usersCollection.updateOne(
+        { email: userEmail },
+        { $pull: { wishlist: productIdToRemove } }
+      );
+
+      res.send(result);
+    });
+
+    app.get("/wishlist/:userId", async (req, res) => {
+      const { userId } = req.params;
+      const user = await usersCollection.findOne({
+        _id: new ObjectId(String(userId)),
+      });
+
+      if (!user) {
+        res.send("User not found!");
+      }
+
+
+      const result = await allProductCollection
+        .find({ _id: { $in: user?.wishlist || [] } })
+        .toArray();
+
+      res.send(result);
+    });
+
+    app.get("/wishlist/:userId", async (req, res) => {
+      const { userId } = req.params;
+      const user = await usersCollection.findOne({
+        _id: new ObjectId(String(userId)),
+      });
+
+      if (!user) {
+        res.send("User not found!");
+      }
+
+      console.log(user);
+
+      const result = await allProductCollection
+        .find({ _id: { $in: user?.wishlist || [] } })
+        .toArray();
+
       res.send(result);
     });
   } catch (err) {
